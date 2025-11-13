@@ -1,6 +1,17 @@
 dterm: A simple terminal program
 
 
+This version has added the parameter asrmode. If set, bit 8 from all
+incoming data is set to 0. This is helpful when trying to talk to a
+device that expects a teletype like an ASR33 connected to a pdp/8
+
+When using slow reading software like 8K Basic it is good to set
+delay=5 and crwait=250 so you can copy/paste long programs without
+any errors.
+
+
+
+
 dterm is a simple terminal emulator, which doesn't actually emulate
 any particular terminal.  Mainly, it is designed for use with xterm
 and friends, which already do a perfectly good emulation, and therefore

@@ -115,6 +115,7 @@ static int delay = 0;		/* Millisecond delay after each key	*/
 static int linedelay = 0;	/* Millisecond delay after each CR	*/
 static int showspecial = 0;	/* Show special chars as [xx]		*/
 static int noshell = 0;		/* Prevent !<command> execution		*/
+static int asrmode = 0;		/* ignore bit 8 for ASR33 compat	*/
 
 /* Hayyyeeellllllppppp!!!!
  */
@@ -151,6 +152,7 @@ help() {
 "crwait=<n>	Add delay of <n> ms after each line sent\n"
 "esc=<c> 	Set command mode character to Ctrl/<c>\n"
 "ctrl,hex,noctrl	Show control characters as ^n (except tab, CR, LF)\n"
+"asrmode, noasrmode	Enable / disable ASR33 compatible mode (ignore Bit8 recv)\n"
 
 	, cmdchar + '@');
 }
@@ -250,6 +252,7 @@ showsetup() {
 	if(maplf)		fprintf(stderr, " maplf");
 	if(ignorecr)		fprintf(stderr, " igncr");
 	if(crlf)		fprintf(stderr, " crlf");
+	if(asrmode)		fprintf(stderr, " asrmode");
 	if(showspecial == 1)	fprintf(stderr, " ctrl");
 	if(showspecial == 2)	fprintf(stderr, " hex");
 	putc('\n', stderr);
@@ -556,6 +559,10 @@ setup(char *s, char *cffile, int cfline) {
 				showspecial = 2;
 			else if(!strcasecmp(s, "noctrl"))
 				showspecial = 0;
+			else if(!strcasecmp(s, "asrmode"))
+				asrmode = 1;
+			else if(!strcasecmp(s, "noasrmode"))
+				asrmode = 0;
 			else if(!strcasecmp(s, "speeds")) {
 				for(i = 0; speeds[i].s; i++) {
 					if(i && !(i % 4))
@@ -954,9 +961,18 @@ main(int argc, char **argv) {
 		 */
 		if(FD_ISSET(fd, &fds)) {
 			i = read(fd, buf, sizeof(buf));
+			
 			if(i < 0) 
 				DIEP(device);
 			if(!i)	break;
+
+			/* ASR33: Strip bit 8 from received characters */
+			if(asrmode) {
+				for(j = 0; j < i; j++) {
+					buf[j] &= 0x7F;
+				}
+			}
+
 			if(showspecial) {
 				s = buf;
 				do {
