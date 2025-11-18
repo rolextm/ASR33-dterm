@@ -141,6 +141,7 @@ help() {
 "rx <filename>	Receive file (XMODEM)	sx <filename>	Send file (XMODEM)\n"
 "rb <filename>	Receive file (YMODEM)	sb <filename>	Send file (YMODEM)\n"
 "rz		Receive file (ZMODEM)	sz <filename>	Send file (ZMODEM)\n"
+"raw <filename>	Send raw binary file (no protocol)\n"
 "modem		Hang up modem on exit, exit if modem hangs up\n"
 "nomodem 	Do not do modem control\n"
 "bs, nobs	Enable / disable mapping of Delete to Backspace\n"
@@ -264,6 +265,58 @@ showsetup() {
 			   modem & TIOCM_CD  ? "on" : "off");
 	fprintf(stderr, "Escape character: ^%c\n", cmdchar + '@');
 	fflush(stderr);
+}
+
+/*
+ Send a raw binary file without any protocol interpretation
+ Just read the file and send it byte by byte to the serial port
+ */
+static int
+sendraw(char *filename) {
+	FILE *f;
+	unsigned char buf[1024];
+	size_t n;
+	int total = 0;
+	
+	/* Trim trailing whitespace from filename */
+	unsigned char *p = (unsigned char *)filename;
+	while(*p != '\0' && !isspace(*p))
+		p++;
+	*p = '\0';
+	
+	/* Check if filename is provided */
+	if(*filename == 0) {
+		fprintf(stderr, "File name required for raw send\n");
+		return -1;
+	}
+	
+	/* Open file for reading */
+	f = fopen(filename, "rb");
+	if(!f) {
+		fprintf(stderr, "raw send: %s: %s\n", filename, strerror(errno));
+		return -1;
+	}
+	
+	fprintf(stderr, "Sending raw binary file: %s\n", filename);
+	
+	/* Read and send file contents */
+	while((n = fread(buf, 1, sizeof(buf), f)) > 0) {
+		if(write(fd, buf, n) != (ssize_t)n) {
+			fprintf(stderr, "Write error: %s\n", strerror(errno));
+			fclose(f);
+			return -1;
+		}
+		total += n;
+		
+		/* Optional: show progress */
+		if(total % 10240 == 0) {
+			fprintf(stderr, "Sent %d bytes\r", total);
+		}
+	}
+	
+	fprintf(stderr, "Sent %d bytes total\n", total);
+	fclose(f);
+	return 0;
 }
 
 
@@ -430,6 +483,22 @@ setup(char *s, char *cffile, int cfline) {
 				*t = 0;
 			for(t = s + 2; isspace(*t); ) t++;
 			return rzsz(s, t);
+		}
+
+
+		/*
+		 Raw binary file send (raw)
+		 Send file without any protocol
+		 Allow "rawfilename" or "raw filename"
+		 */
+		if(s[0] == 'r' && s[1] == 'a' && s[2] == 'w' && 
+		   (isspace(s[3]) || !s[3])) {
+			if((t = strchr(s, '\n')))
+				*t = 0;
+			for(t = s + 3; isspace(*t); ) t++;
+			sendraw(t);           // sendraw() ignoriert Return-Wert
+			return -4;            // -4 (= verlasse Prompt-Modus)
+		
 		}
 
 		/*
@@ -1068,6 +1137,8 @@ main(int argc, char **argv) {
 					i = setup(cmdbuf, 0, 0);
 					if(i == -3) 
 						return 0;
+					if(i == -4)      // ← NEU: Prüft auf -4 und bricht die Schleife ab
+					break;
 					if(i == 1) {
 						nfd = openport(device);
 						if(nfd >= 0) {

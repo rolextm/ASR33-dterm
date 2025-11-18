@@ -9,7 +9,9 @@ When using slow reading software like 8K Basic it is good to set
 delay=5 and crwait=250 so you can copy/paste long programs without
 any errors.
 
-
+Added new keyword "raw <filename>" to send raw binary data.
+This command directly send files without any alteration, enabling you 
+to send the RIM and BIN Loader and the applications without leaving dterm.
 
 
 dterm is a simple terminal emulator, which doesn't actually emulate
